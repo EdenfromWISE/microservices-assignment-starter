@@ -1,0 +1,298 @@
+openapi: 3.0.3
+info:
+  title: Damage & Penalty Service API
+  description: Manages damage reports and penalties for the car rental system
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api
+    description: Via Gateway
+
+paths:
+  /damage-reports:
+    post:
+      summary: Submit a damage report
+      tags: [Damage Reports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DamageReportDTO'
+      responses:
+        '201':
+          description: Damage report created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DamageReport'
+        '400':
+          description: Invalid request body
+
+    get:
+      summary: List damage reports
+      tags: [Damage Reports]
+      parameters:
+        - name: vehicleId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: rentalId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DamageStatus'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of damage reports
+
+  /damage-reports/{damageId}:
+    get:
+      summary: Get damage report by ID
+      tags: [Damage Reports]
+      parameters:
+        - name: damageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Damage report details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DamageReport'
+        '404':
+          description: Damage report not found
+
+    patch:
+      summary: Update damage report status and repair cost
+      tags: [Damage Reports]
+      parameters:
+        - name: damageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/DamageStatus'
+        - name: repairCost
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Damage report updated
+        '404':
+          description: Damage report not found
+
+  /damage-reports/health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              example:
+                status: ok
+
+  /penalties:
+    post:
+      summary: Create a penalty manually
+      tags: [Penalties]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PenaltyDTO'
+      responses:
+        '201':
+          description: Penalty created
+        '400':
+          description: Invalid request
+
+    get:
+      summary: List penalties
+      tags: [Penalties]
+      parameters:
+        - name: rentalId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: customerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/PenaltyPaymentStatus'
+      responses:
+        '200':
+          description: List of penalties
+
+  /penalties/{penaltyId}:
+    get:
+      summary: Get penalty by ID
+      tags: [Penalties]
+      parameters:
+        - name: penaltyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Penalty details
+        '404':
+          description: Penalty not found
+
+  /penalties/{penaltyId}/pay:
+    post:
+      summary: Record a penalty payment
+      tags: [Penalties]
+      parameters:
+        - name: penaltyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PenaltyPaymentDTO'
+      responses:
+        '200':
+          description: Payment recorded
+        '404':
+          description: Penalty not found
+
+components:
+  schemas:
+    DamageReportDTO:
+      type: object
+      required: [rentalId, vehicleId, damageType, severity, description]
+      properties:
+        rentalId:
+          type: string
+          format: uuid
+        vehicleId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        damageType:
+          $ref: '#/components/schemas/DamageType'
+        severity:
+          $ref: '#/components/schemas/DamageSeverity'
+        description:
+          type: string
+        locationOnVehicle:
+          type: string
+        reportedBy:
+          type: string
+          default: STAFF
+
+    PenaltyDTO:
+      type: object
+      required: [rentalId, customerId, penaltyType, penaltyAmount]
+      properties:
+        rentalId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        vehicleId:
+          type: string
+          format: uuid
+        penaltyType:
+          $ref: '#/components/schemas/PenaltyType'
+        description:
+          type: string
+        penaltyAmount:
+          type: number
+
+    PenaltyPaymentDTO:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+
+    DamageReport:
+      type: object
+      properties:
+        damageId:
+          type: string
+          format: uuid
+        vehicleId:
+          type: string
+          format: uuid
+        rentalId:
+          type: string
+          format: uuid
+        damageType:
+          $ref: '#/components/schemas/DamageType'
+        severity:
+          $ref: '#/components/schemas/DamageSeverity'
+        description:
+          type: string
+        repairCost:
+          type: number
+        status:
+          $ref: '#/components/schemas/DamageStatus'
+        reportedDate:
+          type: string
+          format: date-time
+
+    DamageType:
+      type: string
+      enum: [SCRATCH, DENT, BROKEN_PART, INTERIOR_DAMAGE, MECHANICAL]
+
+    DamageSeverity:
+      type: string
+      enum: [MINOR, MODERATE, MAJOR, TOTAL_LOSS]
+
+    DamageStatus:
+      type: string
+      enum: [REPORTED, APPROVED, REJECTED, REPAIRED]
+
+    PenaltyType:
+      type: string
+      enum: [LATE_RETURN, DAMAGE, MILEAGE_EXCESS, FUEL, CLEANLINESS]
+
+    PenaltyPaymentStatus:
+      type: string
+      enum: [UNPAID, PARTIALLY_PAID, PAID]

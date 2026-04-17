@@ -1,0 +1,275 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: Manages payments and invoices for the car rental system
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api
+    description: Via Gateway
+
+paths:
+  /payments:
+    post:
+      summary: Create a new payment
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateDTO'
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: Invalid request body
+
+    get:
+      summary: List all payments
+      tags: [Payments]
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/PaymentStatus'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of payments
+
+  /payments/{paymentId}:
+    get:
+      summary: Get payment by ID
+      tags: [Payments]
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Payment not found
+
+  /payments/{paymentId}/process:
+    patch:
+      summary: Process a pending payment
+      tags: [Payments]
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentProcessDTO'
+      responses:
+        '200':
+          description: Payment processed
+        '402':
+          description: Payment failed
+        '404':
+          description: Payment not found
+
+  /payments/{paymentId}/refund:
+    post:
+      summary: Create a refund for a completed payment
+      tags: [Payments]
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: amount
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: reason
+          in: query
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Refund created
+        '404':
+          description: Payment not found
+
+  /payments/rental/{rentalId}:
+    get:
+      summary: Get all payments for a rental
+      tags: [Payments]
+      parameters:
+        - name: rentalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of payments for the rental
+
+  /payments/health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              example:
+                status: ok
+
+  /invoices:
+    post:
+      summary: Create an invoice
+      tags: [Invoices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreateDTO'
+      responses:
+        '201':
+          description: Invoice created
+        '400':
+          description: Invalid request
+
+    get:
+      summary: List invoices
+      tags: [Invoices]
+      parameters:
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: unpaidOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of invoices
+
+  /invoices/{invoiceId}:
+    get:
+      summary: Get invoice by ID
+      tags: [Invoices]
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice details
+        '404':
+          description: Invoice not found
+
+components:
+  schemas:
+    PaymentCreateDTO:
+      type: object
+      required: [rentalId, customerId, paymentType, amount, paymentMethod]
+      properties:
+        rentalId:
+          type: string
+        customerId:
+          type: string
+        invoiceId:
+          type: string
+        paymentType:
+          $ref: '#/components/schemas/PaymentType'
+        amount:
+          type: number
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        description:
+          type: string
+        notes:
+          type: string
+
+    PaymentProcessDTO:
+      type: object
+      properties:
+        transactionReference:
+          type: string
+
+    InvoiceCreateDTO:
+      type: object
+      required: [rentalId, customerId, rentalFee]
+      properties:
+        rentalId:
+          type: string
+        customerId:
+          type: string
+        rentalFee:
+          type: number
+        depositAmount:
+          type: number
+
+    Payment:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        rentalId:
+          type: string
+        customerId:
+          type: string
+        paymentType:
+          $ref: '#/components/schemas/PaymentType'
+        amount:
+          type: number
+        paymentMethod:
+          $ref: '#/components/schemas/PaymentMethod'
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        transactionReference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentStatus:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED]
+
+    PaymentType:
+      type: string
+      enum: [RENTAL, PENALTY, DEPOSIT, REFUND]
+
+    PaymentMethod:
+      type: string
+      enum: [CASH, BANK_TRANSFER, CREDIT_CARD, DEBIT_CARD, E_WALLET, QR_CODE]

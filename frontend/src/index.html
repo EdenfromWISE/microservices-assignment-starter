@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚗 Car Rental Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🚗 Car Rental Management System</h1>
+        <p>Hệ thống quản lý cho thuê xe</p>
+    </header>
+
+    <!-- Service Navigation -->
+    <div class="service-nav">
+        <button class="service-btn active" onclick="showService('rental')">🚗 Rental Service</button>
+        <button class="service-btn payment" onclick="showService('payment')">💳 Payment Service</button>
+        <button class="service-btn damage" onclick="showService('damage')">⚠️ Damage & Penalty</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!--            RENTAL SERVICE               -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="rental-section" class="service-section rental-section active">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('rental', 'create')">➕ Tạo đơn thuê</button>
+            <button class="tab" onclick="showTab('rental', 'list')">📋 Danh sách</button>
+            <button class="tab" onclick="showTab('rental', 'actions')">⚙️ Thao tác</button>
+        </div>
+
+        <!-- CREATE -->
+        <div id="rental-create-tab" class="tab-content active">
+            <div class="card">
+                <h2>➕ Tạo đơn thuê mới</h2>
+                <form id="rental-create-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Customer ID:</label>
+                            <input type="text" id="r-customerId" value="CUST-001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle ID:</label>
+                            <input type="text" id="r-vehicleId" value="VEH-001" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ngày bắt đầu:</label>
+                            <input type="date" id="r-startDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Ngày kết thúc:</label>
+                            <input type="date" id="r-endDate" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Điểm nhận xe:</label>
+                            <input type="text" id="r-pickupLocation" value="Ho Chi Minh City" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Điểm trả xe:</label>
+                            <input type="text" id="r-returnLocation" value="Ho Chi Minh City" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Giá thuê/ngày (VND):</label>
+                            <input type="number" id="r-dailyRate" value="500000" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Đặt cọc (VND):</label>
+                            <input type="number" id="r-depositAmount" value="200000" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Tạo đơn thuê</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- LIST -->
+        <div id="rental-list-tab" class="tab-content">
+            <div class="card">
+                <h2>📋 Danh sách đơn thuê</h2>
+                <div class="filter-bar">
+                    <select id="r-statusFilter">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="CONFIRMED">CONFIRMED</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="INSPECTION">INSPECTION</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="PENALTY_DUE">PENALTY_DUE</option>
+                        <option value="CANCELLED">CANCELLED</option>
+                    </select>
+                    <button onclick="loadRentals()" class="btn btn-primary">🔄 Tải lại</button>
+                </div>
+                <div id="rentals-list"></div>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div id="rental-actions-tab" class="tab-content">
+            <div class="card">
+                <h2>⚙️ Thao tác với đơn thuê</h2>
+                <div class="form-group">
+                    <label>Rental ID:</label>
+                    <input type="text" id="r-actionId" placeholder="Nhập Rental ID">
+                </div>
+                <div class="actions-grid">
+                    <button onclick="rentalAction('confirm')" class="btn btn-success">✅ Xác nhận</button>
+                    <button onclick="rentalAction('pickup')" class="btn btn-info">🚗 Lấy xe</button>
+                    <button onclick="rentalAction('return')" class="btn btn-warning">🔙 Trả xe</button>
+                    <button onclick="rentalAction('complete')" class="btn btn-primary">✔️ Hoàn tất</button>
+                    <button onclick="rentalAction('cancel')" class="btn btn-danger">❌ Hủy</button>
+                    <button onclick="getRentalHistory()" class="btn">📜 Lịch sử</button>
+                </div>
+
+                <h3>Kiểm tra sau trả xe</h3>
+                <form id="inspection-form">
+                    <div class="form-group">
+                        <label>Rental ID:</label>
+                        <input type="text" id="r-inspectionId" required>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="r-hasDamage"> Có hư hại</label>
+                    </div>
+                    <div class="form-group">
+                        <label>Ghi chú:</label>
+                        <textarea id="r-inspectionNotes" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Hoàn tất kiểm tra</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="rental-response" class="response"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!--           PAYMENT SERVICE               -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="payment-section" class="service-section payment-section">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('payment', 'create')">➕ Tạo thanh toán</button>
+            <button class="tab" onclick="showTab('payment', 'list')">📋 Danh sách</button>
+            <button class="tab" onclick="showTab('payment', 'process')">⚙️ Xử lý</button>
+        </div>
+
+        <!-- CREATE -->
+        <div id="payment-create-tab" class="tab-content active">
+            <div class="card">
+                <h2>➕ Tạo thanh toán mới</h2>
+                <form id="payment-create-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Rental ID:</label>
+                            <input type="text" id="p-rentalId" placeholder="e.g., RNT-..." required>
+                        </div>
+                        <div class="form-group">
+                            <label>Customer ID:</label>
+                            <input type="text" id="p-customerId" value="CUST-001" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Loại thanh toán:</label>
+                            <select id="p-paymentType" required>
+                                <option value="DEPOSIT">DEPOSIT - Đặt cọc</option>
+                                <option value="RENTAL">RENTAL - Tiền thuê</option>
+                                <option value="PENALTY">PENALTY - Phạt</option>
+                                <option value="REFUND">REFUND - Hoàn tiền</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Phương thức:</label>
+                            <select id="p-method" required>
+                                <option value="CASH">CASH - Tiền mặt</option>
+                                <option value="BANK_TRANSFER">BANK_TRANSFER - Chuyển khoản</option>
+                                <option value="CREDIT_CARD">CREDIT_CARD - Thẻ tín dụng</option>
+                                <option value="E_WALLET">E_WALLET - Ví điện tử</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Số tiền (VND):</label>
+                        <input type="number" id="p-amount" value="500000" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Mô tả:</label>
+                        <textarea id="p-description" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Tạo thanh toán</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- LIST -->
+        <div id="payment-list-tab" class="tab-content">
+            <div class="card">
+                <h2>📋 Danh sách thanh toán</h2>
+                <div class="filter-bar">
+                    <select id="p-statusFilter">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                        <option value="FAILED">FAILED</option>
+                    </select>
+                    <input type="text" id="p-rentalIdFilter" placeholder="Lọc theo Rental ID">
+                    <button onclick="loadPayments()" class="btn btn-success">🔄 Tải lại</button>
+                </div>
+                <div id="payments-list"></div>
+            </div>
+        </div>
+
+        <!-- PROCESS -->
+        <div id="payment-process-tab" class="tab-content">
+            <div class="card">
+                <h2>⚙️ Xử lý thanh toán</h2>
+                <h3>✅ Xác nhận thanh toán</h3>
+                <form id="process-form">
+                    <div class="form-group">
+                        <label>Payment ID:</label>
+                        <input type="text" id="p-processId" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Transaction Reference:</label>
+                        <input type="text" id="p-transactionRef" value="TXN-12345">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Xử lý thanh toán</button>
+                </form>
+
+                <h3>💸 Hoàn tiền</h3>
+                <form id="refund-form">
+                    <div class="form-group">
+                        <label>Payment ID:</label>
+                        <input type="text" id="p-refundId" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Số tiền hoàn (VND):</label>
+                            <input type="number" id="p-refundAmount" value="100000" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Lý do:</label>
+                            <input type="text" id="p-refundReason" value="Khách hủy đơn">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-warning">Tạo hoàn tiền</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="payment-response" class="response"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!--         DAMAGE & PENALTY SERVICE        -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="damage-section" class="service-section damage-section">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('damage', 'create')">➕ Báo hư hại</button>
+            <button class="tab" onclick="showTab('damage', 'list')">📋 Danh sách</button>
+            <button class="tab" onclick="showTab('damage', 'penalty')">💰 Cập nhật & Phạt</button>
+        </div>
+
+        <!-- CREATE DAMAGE -->
+        <div id="damage-create-tab" class="tab-content active">
+            <div class="card">
+                <h2>➕ Tạo báo cáo hư hại</h2>
+                <form id="damage-create-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Rental ID:</label>
+                            <input type="text" id="d-rentalId" placeholder="e.g., RNT-..." required>
+                        </div>
+                        <div class="form-group">
+                            <label>Vehicle ID:</label>
+                            <input type="text" id="d-vehicleId" placeholder="e.g., VEH-001" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Loại hư hại:</label>
+                            <select id="d-damageType" required>
+                                <option value="SCRATCH">SCRATCH - Trầy xước</option>
+                                <option value="DENT">DENT - Móp méo</option>
+                                <option value="BROKEN_PART">BROKEN_PART - Vỡ, gãy</option>
+                                <option value="INTERIOR_DAMAGE">INTERIOR_DAMAGE - Nội thất</option>
+                                <option value="MECHANICAL">MECHANICAL - Hỏng cơ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Mức độ:</label>
+                            <select id="d-severity" required>
+                                <option value="MINOR">MINOR - Nhẹ</option>
+                                <option value="MODERATE">MODERATE - Vừa</option>
+                                <option value="MAJOR">MAJOR - Nghiêm trọng</option>
+                                <option value="TOTAL_LOSS">TOTAL_LOSS - Mất hoàn toàn</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Mô tả chi tiết:</label>
+                        <textarea id="d-description" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Tạo báo cáo hư hại</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- LIST DAMAGES -->
+        <div id="damage-list-tab" class="tab-content">
+            <div class="card">
+                <h2>📋 Danh sách báo cáo hư hại</h2>
+                <div class="filter-bar">
+                    <select id="d-statusFilter">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="REPORTED">REPORTED</option>
+                        <option value="APPROVED">APPROVED</option>
+                        <option value="REJECTED">REJECTED</option>
+                        <option value="REPAIRED">REPAIRED</option>
+                    </select>
+                    <button onclick="loadDamages()" class="btn btn-danger">🔄 Tải lại</button>
+                </div>
+                <div id="damages-list"></div>
+            </div>
+        </div>
+
+        <!-- PENALTY -->
+        <div id="damage-penalty-tab" class="tab-content">
+            <div class="card">
+                <h2>💰 Cập nhật trạng thái & Tính phạt</h2>
+                <form id="damage-update-form">
+                    <div class="form-group">
+                        <label>Damage Report ID:</label>
+                        <input type="text" id="d-damageId" placeholder="UUID của damage report" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Trạng thái mới:</label>
+                            <select id="d-newStatus" required>
+                                <option value="APPROVED">APPROVED - Duyệt & tính phạt</option>
+                                <option value="REJECTED">REJECTED - Từ chối</option>
+                                <option value="REPAIRED">REPAIRED - Đã sửa xong</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Chi phí sửa chữa (VND):</label>
+                            <input type="number" id="d-repairCost" value="1000000">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Cập nhật & Tính phạt</button>
+                </form>
+
+                <div class="note-box">
+                    <h3>ℹ️ Lưu ý về tính phạt tự động</h3>
+                    <ul>
+                        <li>Severity MODERATE: chi phí × 2.0</li>
+                        <li>Severity MAJOR: chi phí × 4.0</li>
+                        <li>Penalty được tạo tự động khi severity ≥ MODERATE</li>
+                        <li>Event <code>penalty.created</code> sẽ được publish qua RabbitMQ</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="damage-response" class="response"></div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

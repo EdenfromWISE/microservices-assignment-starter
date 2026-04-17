@@ -19,68 +19,167 @@ services:
     ports:
       - "${GATEWAY_PORT:-8080}:8000"
     depends_on:
-      - service-a
-      - service-b
+      - rental-service
+      - payment-service
+      - damage-penalty-service
     networks:
       - app-network
 
-  # ─── Service A ───────────────────────────────────
-  service-a:
+  # ─── Rental Service ──────────────────────────────
+  rental-service:
     build: ./services/service-a
     ports:
-      - "${SERVICE_A_PORT:-5001}:5000"
+      - "${RENTAL_SERVICE_PORT:-8081}:8081"
     env_file:
       - .env
+    environment:
+      DB_HOST: rental-db
+      DB_PORT: 3306
+      DB_NAME: rental_db
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rental-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - app-network
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/rentals/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # ─── Service B ───────────────────────────────────
-  service-b:
-    build: ./services/service-b
+  # ─── Payment Service ─────────────────────────────
+  payment-service:
+    build: ./services/payment-service
     ports:
-      - "${SERVICE_B_PORT:-5002}:5000"
+      - "${PAYMENT_SERVICE_PORT:-8082}:8082"
     env_file:
       - .env
+    environment:
+      DB_HOST: payment-db
+      DB_PORT: 3306
+      DB_NAME: payment_db
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/payments/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # ─── Shared Infrastructure (uncomment as needed) ─
-  # db:
-  #   image: postgres:16-alpine    # or mysql:8, mongo:7, etc.
-  #   ports:
-  #     - "${DB_PORT:-5432}:5432"
-  #   environment:
-  #     POSTGRES_DB: ${DB_NAME:-mydb}
-  #     POSTGRES_USER: ${DB_USER:-admin}
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-  #   volumes:
-  #     - db-data:/var/lib/postgresql/data
-  #   networks:
-  #     - app-network
+  # ─── Damage & Penalty Service ────────────────────
+  damage-penalty-service:
+    build: ./services/damage-penalty-service
+    ports:
+      - "${DAMAGE_SERVICE_PORT:-8083}:8083"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: damage-db
+      DB_PORT: 3306
+      DB_NAME: damage_db
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      damage-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/damage-reports/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - app-network
+  # ─── Databases ───────────────────────────────────
+  rental-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: rental_db
+      MYSQL_USER: ${DB_USER:-admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - rental-db-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # rabbitmq:
-  #   image: rabbitmq:3-management-alpine
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   networks:
-  #     - app-network
+  payment-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: payment_db
+      MYSQL_USER: ${DB_USER:-admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - payment-db-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  damage-db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: damage_db
+      MYSQL_USER: ${DB_USER:-admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - damage-db-data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── RabbitMQ ────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   app-network:
     driver: bridge
 
-# volumes:
-#   db-data:
+volumes:
+  rental-db-data:
+  payment-db-data:
+  damage-db-data:
+  rabbitmq-data:
