@@ -185,7 +185,6 @@ Based on Non-Functional Requirements (1.3) and Processing Requirements, identify
 
 | Candidate | Type (Utility / Microservice) | Justification (link to NFR or process requirement) |
 |-----------|-------------------------------|-----------------------------------------------------|
-| statistics-service | Microservice | NFR: Performance — revenue statistics are read-heavy and must respond within 1s. Isolated with Redis caching and independent scaling; a statistics failure must never affect the core rental flow |
 | payment-service | Microservice | NFR: Availability + Security — payment processing is critical and must be isolated so that a rental-service outage cannot block payment transactions; also isolates financial logic for security |
 
 ### 2.8 Service Composition Candidates

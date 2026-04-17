@@ -78,11 +78,9 @@
 | **rental-service** | Manages rental lifecycle: booking, pickup, return, completion (State Pattern) | Java 17, Spring Boot 3 | 8081 |
 | **payment-service** | Processes deposit and penalty payments, generates invoices | Java 17, Spring Boot 3 | 8082 |
 | **damage-penalty-service** | Records damage reports, auto-calculates repair costs, manages penalties | Java 17, Spring Boot 3 | 8080 |
-| **statistics-service** | Aggregates and caches revenue statistics by month/quarter/year | Java 17, Spring Boot 3 | 8083 |
 | **rental-db** | Stores rentals and rental state history | PostgreSQL 15 | 5432 |
 | **payment-db** | Stores payments and invoices | PostgreSQL 15 | 5433 |
 | **damage-db** | Stores damage reports and penalties | PostgreSQL 15 | 5434 |
-| **statistics-db** | Stores aggregated revenue statistics | PostgreSQL 15 | 5435 |
 | **RabbitMQ** | Async event bus between services | RabbitMQ 3 | 5672 |
 | **Redis** | Caches statistics query results (TTL: 1 hour) | Redis 7 | 6379 |
 
@@ -122,14 +120,13 @@
 
 > Replace the column/row headers with your actual service names from Section 2.
 
-| From → To | Frontend | Gateway | rental-service | payment-service | damage-penalty-service | statistics-service | RabbitMQ | Redis |
-|-----------|----------|---------|----------------|-----------------|------------------------|-------------------|----------|-------|
-| **Frontend** | — | REST | — | — | — | — | — | — |
-| **Gateway** | — | — | REST | REST | REST | REST | — | — |
-| **rental-service** | — | — | — | — | — | — | async/event | — |
-| **payment-service** | — | — | — | — | — | — | async/event | — |
-| **damage-penalty-service** | — | — | — | — | — | — | async/event | — |
-| **statistics-service** | — | — | — | — | — | — | async/event | TCP |
+| From → To | Frontend | Gateway | rental-service | payment-service | damage-penalty-service | RabbitMQ |
+|-----------|----------|---------|----------------|-----------------|------------------------|----------|
+| **Frontend** | — | REST | — | — | — | — |
+| **Gateway** | — | — | REST | REST | REST | — |
+| **rental-service** | — | — | — | — | — | async/event |
+| **payment-service** | — | — | — | — | — | async/event |
+| **damage-penalty-service** | — | — | — | — | — | async/event |
 
 ---
 
@@ -177,15 +174,11 @@ C4Container
         Container(rental, "rental-service", "Java 17, Spring Boot 3", "Manages rental lifecycle with State Pattern. Port 8081")
         Container(payment, "payment-service", "Java 17, Spring Boot 3", "Processes payments and invoices. Port 8082")
         Container(damage, "damage-penalty-service", "Java 17, Spring Boot 3", "Records damage reports and auto-creates penalties. Port 8080")
-        Container(stats, "statistics-service", "Java 17, Spring Boot 3", "Aggregates revenue statistics with Redis cache. Port 8083")
-
         ContainerDb(rentaldb, "rental-db", "PostgreSQL 15", "Rentals and state history. Port 5432")
         ContainerDb(paymentdb, "payment-db", "PostgreSQL 15", "Payments and invoices. Port 5433")
         ContainerDb(damagedb, "damage-db", "PostgreSQL 15", "Damage reports and penalties. Port 5434")
-        ContainerDb(statsdb, "statistics-db", "PostgreSQL 15", "Aggregated revenue statistics. Port 5435")
 
-        Container(broker, "RabbitMQ", "RabbitMQ 3", "Async event bus — penalty.created, payment.completed, rental.completed. Port 5672")
-        ContainerDb(redis, "Redis", "Redis 7", "Statistics query cache, TTL 1 hour. Port 6379")
+        Container(broker, "RabbitMQ", "RabbitMQ 3", "Async event bus — penalty.created, payment.completed. Port 5672")
     }
 
     Rel(customer, fe, "Uses", "HTTPS")
@@ -194,17 +187,13 @@ C4Container
     Rel(gw, rental, "Routes to", "HTTP/REST")
     Rel(gw, payment, "Routes to", "HTTP/REST")
     Rel(gw, damage, "Routes to", "HTTP/REST")
-    Rel(gw, stats, "Routes to", "HTTP/REST")
     Rel(rental, rentaldb, "Reads/Writes", "TCP")
     Rel(payment, paymentdb, "Reads/Writes", "TCP")
     Rel(damage, damagedb, "Reads/Writes", "TCP")
-    Rel(stats, statsdb, "Reads/Writes", "TCP")
-    Rel(stats, redis, "Caches queries", "TCP")
     Rel(rental, broker, "Publishes events", "AMQP")
     Rel(payment, broker, "Publishes events", "AMQP")
     Rel(damage, broker, "Publishes events", "AMQP")
     Rel(broker, rental, "Delivers events", "AMQP")
-    Rel(broker, stats, "Delivers events", "AMQP")
 ```
 
 > 💡 **How to adapt this diagram:**
