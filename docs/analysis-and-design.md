@@ -47,16 +47,14 @@ Both approaches lead to a list of services with clear responsibilities. This app
 
 ### 1.1 Business Process Definition
 
-Describe the **one** business process your team will automate. Keep scope realistic for 4–6 weeks.
-
-- **Domain**: *(e.g., Online Food Delivery, University Course Registration, ...)*
-- **Business Process**: *(e.g., "Customer places an order and receives delivery")*
-- **Actors**: *(e.g., Customer, Restaurant Owner, Delivery Driver)*
-- **Scope**: *(e.g., "From order placement to delivery confirmation — excluding payment settlement")*
+- **Domain**: Car Rental Management
+- **Business Process**: "Customer rents a car and returns it with damage found during inspection"
+- **Actors**: Customer, Staff, Payment Gateway
+- **Scope**: From booking creation to rental completion — including damage reporting and penalty payment. Excludes vehicle maintenance after penalty is paid.
 
 **Process Diagram:**
 
-*(Insert BPMN, flowchart, or image into `docs/asset/` and reference here)*
+![Car Rental Process](asset/Car%20Rental%20Process.jpg)
 
 > 💡 **Tip:** A good scope for this assignment is a process with 5–15 steps and 2–4 actors. If your process has more than 20 steps, narrow the scope.
 
@@ -66,9 +64,13 @@ List existing systems, databases, or legacy logic related to this process.
 
 | System Name | Type | Current Role | Interaction Method |
 |-------------|------|--------------|-------------------|
-|             |      |              |                   |
-
-> If none exist, state: *"None — the process is currently performed manually."*
+| rental-service | Microservice | Manages rental lifecycle (booking → pickup → return → inspection → completion) | REST API |
+| payment-service | Microservice | Processes deposit and penalty payments, generates invoices | REST API + RabbitMQ events |
+| damage-penalty-service | Microservice | Records damage reports, calculates repair costs, manages penalties | REST API + RabbitMQ events |
+| statistics-service | Microservice | Aggregates revenue and rental statistics, cached via Redis | REST API + RabbitMQ events |
+| PostgreSQL | Database | Persistent storage for each service (database-per-service pattern) | JDBC / Spring Data JPA |
+| RabbitMQ | Message Broker | Async event bus between services (e.g., penalty.created, payment.completed) | AMQP |
+| Redis | Cache | Caches statistics query results (TTL: 1 hour) | Spring Cache / Lettuce |
 
 ### 1.3 Non-Functional Requirements
 
@@ -78,10 +80,10 @@ Non-functional requirements serve as input in two places:
 
 | Requirement    | Description |
 |----------------|-------------|
-| Performance    |             |
-| Security       |             |
-| Scalability    |             |
-| Availability   |             |
+| Performance    | Statistics queries must respond within 1 second — achieved via Redis caching (1-hour TTL) on the statistics-service |
+| Security       | Role-based access control (RBAC): Customer can only access own rental data; Staff can manage rentals and damage reports; Admin has full access. All APIs secured via JWT |
+| Scalability    | Rental and payment services must handle traffic spikes independently — each service scales horizontally; database-per-service pattern prevents shared bottlenecks |
+| Availability   | Payment and rental services are critical — deployed with multiple replicas; RabbitMQ decouples services so a statistics or damage service outage does not block the core rental flow |
 
 ---
 
@@ -95,13 +97,19 @@ Decompose the process from 1.1 into granular actions. Mark actions unsuitable fo
 
 | # | Action | Actor | Description | Suitable? |
 |---|--------|-------|-------------|-----------|
-| *(e.g., 1)* | *(e.g., SubmitOrder)* | *(e.g., Customer)* | *(e.g., Customer submits order with items and delivery address)* | ✅ |
-| *(e.g., 2)* | *(e.g., Taste-test food)* | *(e.g., Chef)* | *(e.g., Chef manually approves dish quality)* | ❌ |
-|   |        |       |             | ✅ / ❌    |
-
-> ⚠️ **Common mistake:** Marking everything ✅ or ❌. A typical 10-step process has 1–3 unsuitable actions. If you have none, reconsider whether any step truly requires human judgment.
-
-> Actions marked ❌ are excluded from further steps. Document the reason in the Description column.
+| 1 | CreateBooking | Customer | Customer submits booking with vehicle ID, dates, pickup/return location, and daily rate | ✅ |
+| 2 | PayDeposit | Customer | Customer initiates a deposit payment for the booking | ✅ |
+| 3 | ProcessDepositPayment | Payment Gateway | External gateway processes the deposit transaction and returns success/failure | ✅ |
+| 4 | ConfirmBooking | Staff | Staff reviews and confirms the booking after deposit is received — requires human judgment to verify customer identity and vehicle availability | ❌ |
+| 5 | PickupVehicle | Customer | Customer arrives and picks up the vehicle; rental state transitions to IN_PROGRESS | ✅ |
+| 6 | ReturnVehicle | Customer | Customer returns the vehicle; rental state transitions to INSPECTION | ✅ |
+| 7 | InspectVehicle | Staff | Staff physically examines the vehicle for damage — requires irreducible human judgment | ❌ |
+| 8 | ReportDamage | Staff | Staff submits a damage report with type, severity, and description | ✅ |
+| 9 | CalculateRepairCostAndCreatePenalty | System | System automatically calculates repair cost based on damage severity and creates a penalty record | ✅ |
+| 10 | NotifyCustomer | System | System sends penalty notice to customer with amount and due date | ✅ |
+| 11 | PayPenalty | Customer | Customer initiates payment for the penalty amount | ✅ |
+| 12 | ProcessPenaltyPayment | Payment Gateway | External gateway processes the penalty transaction and returns success/failure | ✅ |
+| 13 | CompleteRental | System | System transitions rental to COMPLETED and updates statistics | ✅ |
 
 ### 2.3 Entity Service Candidates
 
@@ -113,11 +121,9 @@ Identify business entities and group reusable (agnostic) actions into Entity Ser
 
 | Entity | Service Candidate | Agnostic Actions |
 |--------|-------------------|------------------|
-| *(e.g., Order)* | *(e.g., order-service)* | *(e.g., CreateOrder, GetOrder, CancelOrder)* |
-| *(e.g., Customer)* | *(e.g., customer-service)* | *(e.g., GetCustomer, UpdateCustomerAddress)* |
-|        |                   |                  |
-
-> ⚠️ **Common mistake:** Putting all actions under one "business-service". If your Entity column has only one row, re-examine whether your actions actually span multiple entities.
+| Rental | rental-service | CreateBooking, PickupVehicle, ReturnVehicle, CompleteRental |
+| Payment | payment-service | PayDeposit, ProcessDepositPayment, PayPenalty, ProcessPenaltyPayment |
+| DamageReport, Penalty | damage-penalty-service | ReportDamage, CalculateRepairCostAndCreatePenalty |
 
 ### 2.4 Task Service Candidate
 
@@ -127,8 +133,8 @@ Group process-specific (non-agnostic) actions into a Task Service Candidate.
 
 | Non-agnostic Action | Task Service Candidate |
 |---------------------|------------------------|
-| *(e.g., ProcessOrderCheckout)* | *(e.g., checkout-service)* |
-|                     |                        |
+| CompleteRental | rental-service (orchestrator) — coordinates with damage-penalty-service (check penalty status) and payment-service (verify all payments) before transitioning rental to COMPLETED |
+| NotifyCustomer | rental-service (orchestrator) — triggers notification after penalty is created by damage-penalty-service |
 
 > 💡 **Rule of thumb:** A Task Service typically calls two or more Entity Services in sequence to complete one business process step. If an action only touches one entity, it likely belongs in an Entity Service instead.
 
@@ -140,9 +146,12 @@ Map entities/processes to REST URI Resources.
 
 | Entity / Process | Resource URI |
 |------------------|--------------|
-| *(e.g., Order)* | *(e.g., /orders, /orders/{id})* |
-| *(e.g., Customer)* | *(e.g., /customers, /customers/{id})* |
-|                  |              |
+| Rental | `/rentals`, `/rentals/{id}` |
+| Rental state transitions | `/rentals/{id}/confirm`, `/rentals/{id}/pickup`, `/rentals/{id}/return`, `/rentals/{id}/complete` |
+| Payment | `/payments`, `/payments/{id}` |
+| Invoice | `/invoices`, `/invoices/{id}` |
+| DamageReport | `/damage-reports`, `/damage-reports/{id}` |
+| Penalty | `/penalties`, `/penalties/{id}`, `/penalties/{id}/pay` |
 
 > ⚠️ **Common mistake:** Using verbs in URIs (e.g., `/createOrder`). REST resources are nouns — the HTTP method (GET/POST/PUT/DELETE) expresses the action.
 
@@ -152,10 +161,17 @@ Map entities/processes to REST URI Resources.
 
 | Service Candidate | Capability | Resource | HTTP Method |
 |-------------------|------------|----------|-------------|
-| *(e.g., order-service)* | *(e.g., CreateOrder)* | *(e.g., /orders)* | *(e.g., POST)* |
-| *(e.g., order-service)* | *(e.g., GetOrder)* | *(e.g., /orders/{id})* | *(e.g., GET)* |
-| *(e.g., order-service)* | *(e.g., CancelOrder)* | *(e.g., /orders/{id})* | *(e.g., DELETE)* |
-|                   |            |          |             |
+| rental-service | CreateBooking | `/rentals` | POST |
+| rental-service | PickupVehicle | `/rentals/{id}/pickup` | POST |
+| rental-service | ReturnVehicle | `/rentals/{id}/return` | POST |
+| rental-service | CompleteRental | `/rentals/{id}/complete` | POST |
+| payment-service | PayDeposit | `/payments` | POST |
+| payment-service | ProcessDepositPayment | `/payments/{id}/process` | POST |
+| payment-service | PayPenalty | `/payments` | POST |
+| payment-service | ProcessPenaltyPayment | `/payments/{id}/process` | POST |
+| damage-penalty-service | ReportDamage | `/damage-reports` | POST |
+| damage-penalty-service | CalculateRepairCostAndCreatePenalty | `/penalties` | POST (auto-triggered) |
+| damage-penalty-service | NotifyCustomer | `/penalties/{id}` | GET (customer polls) |
 
 > ⚠️ **Check:** Every ✅ action from 2.1–2.2 should appear in this table as a Capability. If an action is missing, trace back to 2.3–2.5 and add it.
 
@@ -169,9 +185,8 @@ Based on Non-Functional Requirements (1.3) and Processing Requirements, identify
 
 | Candidate | Type (Utility / Microservice) | Justification (link to NFR or process requirement) |
 |-----------|-------------------------------|-----------------------------------------------------|
-| *(e.g., notification-service)* | *(e.g., Utility)* | *(e.g., NFR: multiple services need to send email/SMS notifications)* |
-| *(e.g., payment-service)* | *(e.g., Microservice)* | *(e.g., NFR: PCI-DSS compliance requires payment logic isolated from other services)* |
-|           |                               |                                                     |
+| statistics-service | Microservice | NFR: Performance — revenue statistics are read-heavy and must respond within 1s. Isolated with Redis caching and independent scaling; a statistics failure must never affect the core rental flow |
+| payment-service | Microservice | NFR: Availability + Security — payment processing is critical and must be isolated so that a rental-service outage cannot block payment transactions; also isolates financial logic for security |
 
 ### 2.8 Service Composition Candidates
 
@@ -179,21 +194,7 @@ Interaction diagram showing how Service Candidates collaborate to fulfill the bu
 
 > 💡 **How to do it:** Walk through the business process from 1.1 again. For each step, identify which service handles it and what inter-service calls are made. The Task Service (2.4) is typically the orchestrator in the center of the diagram.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant TaskService
-    participant EntityServiceA
-    participant EntityServiceB
-    participant UtilityService
-
-    Client->>TaskService: (fill in)
-    TaskService->>EntityServiceA: (fill in)
-    EntityServiceA-->>TaskService: (fill in)
-    TaskService->>EntityServiceB: (fill in)
-    EntityServiceB-->>TaskService: (fill in)
-    TaskService-->>Client: (fill in)
-```
+![Service Composition Diagram](asset/Rental%20Service%20Payment-serviceDiagram.png)
 
 > ⚠️ **Check:** Compare this diagram with your process diagram in 1.1. Every step in the business process should be handled by at least one service. If a step is not covered, you may be missing a service candidate.
 
@@ -206,24 +207,47 @@ sequenceDiagram
 ### 3.1 Uniform Contract Design
 
 Service Contract specification for each service. Full OpenAPI specs:
-- [`docs/api-specs/service-a.yaml`](api-specs/service-a.yaml)
-- [`docs/api-specs/service-b.yaml`](api-specs/service-b.yaml)
+- [`docs/api-specs/rental-service.yaml`](api-specs/rental-service.yaml)
+- [`docs/api-specs/payment-service.yaml`](api-specs/payment-service.yaml)
+- [`docs/api-specs/damage-penalty-service.yaml`](api-specs/damage-penalty-service.yaml)
+- [`docs/api-specs/statistics-service.yaml`](api-specs/statistics-service.yaml)
 
-> 💡 **Derive from 2.6:** Each row in the capability table (2.6) maps directly to one API endpoint here. The Service Candidate column tells you which service owns it.
-
-**Service A — *(service name)*:**
-
-| Endpoint | Method | Description | Request Body | Response Codes |
-|----------|--------|-------------|--------------|----------------|
-|          |        |             |              |                |
-
-**Service B — *(service name)*:**
+**rental-service:**
 
 | Endpoint | Method | Description | Request Body | Response Codes |
 |----------|--------|-------------|--------------|----------------|
-|          |        |             |              |                |
+| `/rentals` | POST | Create a new booking | `{ customerId, vehicleId, startDate, endDate, pickupLocation, returnLocation, dailyRate }` | 201, 400 |
+| `/rentals/{id}` | GET | Get rental details | — | 200, 404 |
+| `/rentals/{id}/pickup` | POST | Transition rental to IN_PROGRESS | — | 200, 409 |
+| `/rentals/{id}/return` | POST | Transition rental to INSPECTION | — | 200, 409 |
+| `/rentals/{id}/complete` | POST | Transition rental to COMPLETED | — | 200, 409 |
 
-> 💡 **Then:** Update the corresponding OpenAPI YAML files in `docs/api-specs/` to match this table. The YAML is the authoritative contract — the table here is a summary.
+**payment-service:**
+
+| Endpoint | Method | Description | Request Body | Response Codes |
+|----------|--------|-------------|--------------|----------------|
+| `/payments` | POST | Create and process a payment (deposit or penalty) | `{ rentalId, type, amount, method }` | 201, 400 |
+| `/payments/{id}` | GET | Get payment details | — | 200, 404 |
+| `/payments/{id}/process` | POST | Process pending payment via gateway | — | 200, 402 |
+| `/invoices/{id}` | GET | Get invoice for a payment | — | 200, 404 |
+
+**damage-penalty-service:**
+
+| Endpoint | Method | Description | Request Body | Response Codes |
+|----------|--------|-------------|--------------|----------------|
+| `/damage-reports` | POST | Submit a damage report for a rental | `{ rentalId, vehicleId, damageType, severity, description }` | 201, 400 |
+| `/damage-reports/{id}` | GET | Get damage report details | — | 200, 404 |
+| `/penalties` | GET | List penalties for a rental | `?rentalId={id}` | 200 |
+| `/penalties/{id}` | GET | Get penalty details | — | 200, 404 |
+| `/penalties/{id}/pay` | POST | Mark penalty as paid | `{ paymentId }` | 200, 409 |
+
+**statistics-service:**
+
+| Endpoint | Method | Description | Request Body | Response Codes |
+|----------|--------|-------------|--------------|----------------|
+| `/statistics/revenue/monthly/{year}/{month}` | GET | Get monthly revenue | — | 200 |
+| `/statistics/revenue/quarterly/{year}/{quarter}` | GET | Get quarterly revenue | — | 200 |
+| `/statistics/revenue/yearly/{year}` | GET | Get yearly revenue | — | 200 |
 
 ### 3.2 Service Logic Design
 
@@ -231,26 +255,48 @@ Internal processing flow for each service.
 
 > 💡 **How to do it:** For each service, pick its most important endpoint and draw the internal logic. Focus on: input validation → business rule checks → persistence/external calls → response.
 
-**Service A — *(service name)*:**
+**rental-service — POST /rentals (CreateBooking):**
 
 ```mermaid
 flowchart TD
-    A[Receive Request] --> B{Validate input?}
-    B -->|Valid| C{Business rule check?}
-    B -->|Invalid| D[Return 400 Bad Request]
-    C -->|Pass| E[(Persist / Call downstream)]
-    C -->|Fail| F[Return 409 / 422 Error]
-    E --> G[Return 200/201 Response]
+    A[Receive POST /rentals] --> B{Validate input?\ncustomerId, vehicleId, dates, dailyRate}
+    B -->|Invalid| C[Return 400 Bad Request]
+    B -->|Valid| D{Vehicle available?}
+    D -->|No| E[Return 409 Conflict]
+    D -->|Yes| F[(Save Rental — state: PENDING)]
+    F --> G[Publish event: rental.created]
+    G --> H[Return 201 Rental PENDING]
 ```
 
-**Service B — *(service name)*:**
+**damage-penalty-service — POST /damage-reports (ReportDamage):**
 
 ```mermaid
 flowchart TD
-    A[Receive Request] --> B{Validate input?}
-    B -->|Valid| C{Business rule check?}
-    B -->|Invalid| D[Return 400 Bad Request]
-    C -->|Pass| E[(Persist / Call downstream)]
-    C -->|Fail| F[Return 409 / 422 Error]
-    E --> G[Return 200/201 Response]
+    A[Receive POST /damage-reports] --> B{Validate input?\nrentalId, vehicleId, damageType, severity}
+    B -->|Invalid| C[Return 400 Bad Request]
+    B -->|Valid| D{Rental in INSPECTION state?}
+    D -->|No| E[Return 409 Conflict]
+    D -->|Yes| F[(Save DamageReport — status: REPORTED)]
+    F --> G{Severity MODERATE or MAJOR?}
+    G -->|No| H[Return 201 DamageReport REPORTED]
+    G -->|Yes| I[Calculate repair cost]
+    I --> J[(Create Penalty — status: UNPAID)]
+    J --> K[Publish event: penalty.created]
+    K --> H
+```
+
+**payment-service — POST /payments (PayDeposit / PayPenalty):**
+
+```mermaid
+flowchart TD
+    A[Receive POST /payments] --> B{Validate input?\nrentalId, type, amount, method}
+    B -->|Invalid| C[Return 400 Bad Request]
+    B -->|Valid| D[(Save Payment — status: PENDING)]
+    D --> E[Call Payment Gateway]
+    E --> F{Gateway response?}
+    F -->|Success| G[(Update Payment — status: COMPLETED)]
+    G --> H[Publish event: payment.completed]
+    H --> I[Return 201 Payment COMPLETED]
+    F -->|Failed| J[(Update Payment — status: FAILED)]
+    J --> K[Return 402 Payment Required]
 ```

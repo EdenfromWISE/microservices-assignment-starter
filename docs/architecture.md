@@ -56,15 +56,14 @@
 
 | Pattern | Selected? | Derived from (Analysis Step) | Business/Technical Justification |
 |---------|-----------|------------------------------|----------------------------------|
-| API Gateway | | | |
-| Database per Service | | | |
-| Shared Database | | | |
-| Saga | | | |
-| Event-driven / Message Queue | | | |
-| CQRS | | | |
-| Circuit Breaker | | | |
-| Service Registry / Discovery | | | |
-| Other: ___ | | | |
+| API Gateway | ✅ | 2.8 Service Composition | Single entry point for all client traffic; routes to rental, payment, damage-penalty, and statistics services |
+| Database per Service | ✅ | 1.3 NFR: Scalability | Each service owns its own PostgreSQL database — prevents shared bottlenecks and allows independent scaling |
+| Shared Database | ❌ | — | Rejected — would couple service deployments and prevent independent scaling |
+| Saga | ❌ | — | Not needed — cross-service consistency is handled via async events (penalty.created, payment.completed) rather than distributed transactions |
+| Event-driven / Message Queue | ✅ | 1.3 NFR: Availability + 2.8 Service Composition | RabbitMQ decouples services; a statistics or damage service outage does not block the core rental flow |
+| CQRS | ✅ | 1.3 NFR: Performance | statistics-service separates read (Redis-cached queries) from write (event-driven updates) to achieve sub-1s response time |
+| Circuit Breaker | ❌ | — | Not implemented in current scope; recommended for production to protect payment gateway calls |
+| Service Registry / Discovery | ❌ | — | Not needed — Docker Compose DNS handles service-to-service routing by service name |
 
 > Reference: *Microservices Patterns* — Chris Richardson, chapters on decomposition, data management, and communication patterns.
 
@@ -72,13 +71,20 @@
 
 ## 2. System Components
 
-| Component     | Responsibility | Tech Stack      | Port  |
-|---------------|----------------|-----------------|-------|
-| **Frontend**  |                | *(your choice)* | 3000  |
-| **Gateway**   |                | *(your choice)* | 8080  |
-| **Service A** |                | *(your choice)* | 5001  |
-| **Service B** |                | *(your choice)* | 5002  |
-| **Database**  |                | *(your choice)* | 5432  |
+| Component | Responsibility | Tech Stack | Port |
+|-----------|----------------|------------|------|
+| **Frontend** | UI for customers and staff to manage rentals, view damage reports, and pay penalties | HTML / CSS / JavaScript | 3000 |
+| **Gateway** | Single entry point — routes requests to downstream services | Nginx | 8080 |
+| **rental-service** | Manages rental lifecycle: booking, pickup, return, completion (State Pattern) | Java 17, Spring Boot 3 | 8081 |
+| **payment-service** | Processes deposit and penalty payments, generates invoices | Java 17, Spring Boot 3 | 8082 |
+| **damage-penalty-service** | Records damage reports, auto-calculates repair costs, manages penalties | Java 17, Spring Boot 3 | 8080 |
+| **statistics-service** | Aggregates and caches revenue statistics by month/quarter/year | Java 17, Spring Boot 3 | 8083 |
+| **rental-db** | Stores rentals and rental state history | PostgreSQL 15 | 5432 |
+| **payment-db** | Stores payments and invoices | PostgreSQL 15 | 5433 |
+| **damage-db** | Stores damage reports and penalties | PostgreSQL 15 | 5434 |
+| **statistics-db** | Stores aggregated revenue statistics | PostgreSQL 15 | 5435 |
+| **RabbitMQ** | Async event bus between services | RabbitMQ 3 | 5672 |
+| **Redis** | Caches statistics query results (TTL: 1 hour) | Redis 7 | 6379 |
 
 ---
 
@@ -116,12 +122,14 @@
 
 > Replace the column/row headers with your actual service names from Section 2.
 
-| From → To     | Service A | Service B | Gateway | Database |
-|---------------|-----------|-----------|---------|----------|
-| **Frontend**  |           |           |         |          |
-| **Gateway**   |           |           |         |          |
-| **Service A** |           |           |         |          |
-| **Service B** |           |           |         |          |
+| From → To | Frontend | Gateway | rental-service | payment-service | damage-penalty-service | statistics-service | RabbitMQ | Redis |
+|-----------|----------|---------|----------------|-----------------|------------------------|-------------------|----------|-------|
+| **Frontend** | — | REST | — | — | — | — | — | — |
+| **Gateway** | — | — | REST | REST | REST | REST | — | — |
+| **rental-service** | — | — | — | — | — | — | async/event | — |
+| **payment-service** | — | — | — | — | — | — | async/event | — |
+| **damage-penalty-service** | — | — | — | — | — | — | async/event | — |
+| **statistics-service** | — | — | — | — | — | — | async/event | TCP |
 
 ---
 
@@ -137,23 +145,19 @@ Who uses the system and what external systems does it interact with?
 
 ```mermaid
 C4Context
-    title System Context — [Your System Name]
+    title System Context — Car Rental Management System
 
-    Person(user, "End User", "Uses the system via a web browser or mobile app")
-    Person(admin, "Administrator", "Manages system configuration and monitors health")
+    Person(customer, "Customer", "Books vehicles, pays deposits and penalties via web UI")
+    Person(staff, "Staff", "Confirms bookings, inspects vehicles, reports damage")
 
-    System(system, "[Your System Name]", "Automates [your business process]")
+    System(system, "Car Rental Management System", "Automates the car rental process from booking to completion, including damage reporting and penalty payment")
 
-    System_Ext(extPayment, "Payment Gateway", "Processes payments (e.g., Stripe, VNPay)")
-    System_Ext(extEmail, "Email / SMS Provider", "Sends notifications (e.g., SendGrid, Twilio)")
+    System_Ext(extPayment, "Payment Gateway", "Processes deposit and penalty payment transactions")
 
-    Rel(user, system, "Uses", "HTTPS")
-    Rel(admin, system, "Monitors / configures", "HTTPS")
-    Rel(system, extPayment, "Processes payment via", "HTTPS/REST")
-    Rel(system, extEmail, "Sends notifications via", "HTTPS/REST")
+    Rel(customer, system, "Uses", "HTTPS")
+    Rel(staff, system, "Uses", "HTTPS")
+    Rel(system, extPayment, "Processes payments via", "HTTPS/REST")
 ```
-
-> 💡 Remove or replace `extPayment` and `extEmail` with your actual external systems. If there are none, remove those lines.
 
 ### 4.2 Container Diagram (C4 Level 2) — Full Deployment View
 
@@ -161,40 +165,46 @@ All runtime containers and how they communicate. This is the **primary architect
 
 ```mermaid
 C4Container
-    title Container Diagram — [Your System Name]
+    title Container Diagram — Car Rental Management System
 
-    Person(user, "End User")
+    Person(customer, "Customer")
+    Person(staff, "Staff")
 
-    Container_Boundary(sys, "Your System") {
-        Container(fe, "Frontend", "React / Vue / plain HTML", "Serves the UI. Port 3000")
-        Container(gw, "API Gateway", "Nginx / Node / Traefik", "Single entry point — routes requests, handles auth. Port 8080")
+    Container_Boundary(sys, "Car Rental Management System") {
+        Container(fe, "Frontend", "HTML / CSS / JavaScript", "UI for rentals, damage reports, payments. Port 3000")
+        Container(gw, "API Gateway", "Nginx", "Routes all inbound requests to downstream services. Port 8080")
 
-        Container(sa, "Service A", "Python / Node / Java / ...", "Handles [Bounded Context A / Entity A]. Port 5001")
-        Container(sb, "Service B", "Python / Node / Java / ...", "Handles [Bounded Context B / Entity B]. Port 5002")
+        Container(rental, "rental-service", "Java 17, Spring Boot 3", "Manages rental lifecycle with State Pattern. Port 8081")
+        Container(payment, "payment-service", "Java 17, Spring Boot 3", "Processes payments and invoices. Port 8082")
+        Container(damage, "damage-penalty-service", "Java 17, Spring Boot 3", "Records damage reports and auto-creates penalties. Port 8080")
+        Container(stats, "statistics-service", "Java 17, Spring Boot 3", "Aggregates revenue statistics with Redis cache. Port 8083")
 
-        ContainerDb(dba, "Database A", "PostgreSQL / MongoDB / ...", "Stores data for Service A. Port 5432")
-        ContainerDb(dbb, "Database B", "PostgreSQL / MongoDB / ...", "Stores data for Service B. Port 5433")
+        ContainerDb(rentaldb, "rental-db", "PostgreSQL 15", "Rentals and state history. Port 5432")
+        ContainerDb(paymentdb, "payment-db", "PostgreSQL 15", "Payments and invoices. Port 5433")
+        ContainerDb(damagedb, "damage-db", "PostgreSQL 15", "Damage reports and penalties. Port 5434")
+        ContainerDb(statsdb, "statistics-db", "PostgreSQL 15", "Aggregated revenue statistics. Port 5435")
 
-        %% Uncomment if you are using a Service Registry:
-        %% Container(registry, "Service Registry", "Consul / Eureka", "Service discovery and health tracking. Port 8500")
-
-        %% Uncomment if you are using a Message Broker:
-        %% Container(broker, "Message Broker", "Kafka / RabbitMQ", "Async event bus between services. Port 9092")
+        Container(broker, "RabbitMQ", "RabbitMQ 3", "Async event bus — penalty.created, payment.completed, rental.completed. Port 5672")
+        ContainerDb(redis, "Redis", "Redis 7", "Statistics query cache, TTL 1 hour. Port 6379")
     }
 
-    Rel(user, fe, "Uses", "HTTPS")
+    Rel(customer, fe, "Uses", "HTTPS")
+    Rel(staff, fe, "Uses", "HTTPS")
     Rel(fe, gw, "API calls", "HTTP/REST")
-    Rel(gw, sa, "Routes to", "HTTP/REST")
-    Rel(gw, sb, "Routes to", "HTTP/REST")
-    Rel(sa, dba, "Reads/Writes", "TCP")
-    Rel(sb, dbb, "Reads/Writes", "TCP")
-
-    %% Uncomment and adjust for async communication:
-    %% Rel(sa, broker, "Publishes events", "TCP")
-    %% Rel(broker, sb, "Delivers events", "TCP")
-
-    %% Uncomment for gRPC inter-service:
-    %% Rel(sa, sb, "Calls", "gRPC")
+    Rel(gw, rental, "Routes to", "HTTP/REST")
+    Rel(gw, payment, "Routes to", "HTTP/REST")
+    Rel(gw, damage, "Routes to", "HTTP/REST")
+    Rel(gw, stats, "Routes to", "HTTP/REST")
+    Rel(rental, rentaldb, "Reads/Writes", "TCP")
+    Rel(payment, paymentdb, "Reads/Writes", "TCP")
+    Rel(damage, damagedb, "Reads/Writes", "TCP")
+    Rel(stats, statsdb, "Reads/Writes", "TCP")
+    Rel(stats, redis, "Caches queries", "TCP")
+    Rel(rental, broker, "Publishes events", "AMQP")
+    Rel(payment, broker, "Publishes events", "AMQP")
+    Rel(damage, broker, "Publishes events", "AMQP")
+    Rel(broker, rental, "Delivers events", "AMQP")
+    Rel(broker, stats, "Delivers events", "AMQP")
 ```
 
 > 💡 **How to adapt this diagram:**
