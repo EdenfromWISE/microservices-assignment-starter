@@ -1,10 +1,10 @@
-# Project Name
+# Car Rental Management System
 
 [![Stars](https://img.shields.io/github/stars/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/stargazers)
 [![Forks](https://img.shields.io/github/forks/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Brief description of the business process being automated and the service-oriented solution.
+> Car rental workflow automation with microservices: rental lifecycle management, payment/invoice processing, and damage/penalty handling through a unified API gateway.
 
 > **New to this repo?** See [`GETTING_STARTED.md`](GETTING_STARTED.md) for setup instructions, workflow guide, and submission checklist.
 
@@ -14,13 +14,14 @@
 
 | Name | Student ID | Role | Contribution |
 |------|------------|------|-------------|
-|      |            |      |             |
+| Nguyễn Quý Hạnh | B22DCCN277 | Backend & Infrastructure | rental-service, docker-compose, gateway, integration |
+| Nguyễn Anh Tuấn | B22DCCN757 | Backend & Frontend | payment-service, damage-penalty-service, frontend |
 
 ---
 
 ## Business Process
 
-*(Summarize the **one business process** being automated — domain, actors, scope. Example: "Customer places an order and receives delivery in the Online Food Delivery domain.")*
+The system automates the vehicle rental lifecycle for a car rental domain: creating rentals, processing payments/invoices, recording damages, and managing penalties. Main actors are customer and staff; all interactions go through frontend -> gateway -> backend services.
 
 ---
 
@@ -32,18 +33,24 @@
 graph LR
     U[User] --> FE[Frontend :3000]
     FE --> GW[API Gateway :8080]
-    GW --> SA[Service A :5001]
-    GW --> SB[Service B :5002]
-    SA --> DB1[(Database A)]
-    SB --> DB2[(Database B)]
+    GW --> RS[Rental Service :8081]
+    GW --> PS[Payment Service :8082]
+    GW --> DS[Damage Penalty Service :8083]
+    RS --> DB1[(Rental DB)]
+    PS --> DB2[(Payment DB)]
+    DS --> DB3[(Damage DB)]
+    RS --> MQ[(RabbitMQ)]
+    PS --> MQ
+    DS --> MQ
 ```
 
 | Component     | Responsibility | Tech Stack | Port |
 |---------------|----------------|------------|------|
-| **Frontend**  |                |            | 3000 |
-| **Gateway**   |                |            | 8080 |
-| **Service A** |                |            | 5001 |
-| **Service B** |                |            | 5002 |
+| **Frontend**  | UI for rental/payment/damage workflows | Nginx + Vanilla JS | 3000 |
+| **Gateway**   | Reverse proxy and unified API entrypoint | Nginx | 8080 |
+| **Rental Service** | Rental lifecycle and state transitions | Spring Boot + MySQL | 8081 |
+| **Payment Service** | Payments and invoices | Spring Boot + MySQL | 8082 |
+| **Damage Penalty Service** | Damage reports and penalties | Spring Boot + MySQL | 8083 |
 
 ---
 
