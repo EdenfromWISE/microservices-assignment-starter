@@ -2,43 +2,26 @@
 
 ## Overview
 
-The API Gateway serves as the single entry point for all client requests. It routes incoming requests to the appropriate backend microservice.
-
-## Responsibilities
-
-- **Request routing**: Forward requests to the correct service
-- **Load balancing**: Distribute traffic (if applicable)
-- **Authentication**: Validate tokens/credentials (optional)
-- **Rate limiting**: Protect services from overload (optional)
-- **CORS handling**: Allow frontend cross-origin requests
-- **Request/Response transformation**: Modify headers, paths as needed
-
-## Tech Stack
-
-| Component  | Choice             |
-|------------|--------------------|
-| Approach   | *(e.g., Nginx, Express, FastAPI, Kong, Traefik)* |
+Gateway dùng Nginx làm entrypoint duy nhất cho frontend và route request đến các service nội bộ trong Docker network.
 
 ## Routing Table
 
-| External Path        | Target Service | Internal URL                   |
-|----------------------|----------------|--------------------------------|
-| `/api/service-a/*`   | Service A      | `http://service-a:5000/*`      |
-| `/api/service-b/*`   | Service B      | `http://service-b:5000/*`      |
+| External Path | Target Service | Internal URL |
+|---------------|----------------|--------------|
+| `/health` | Gateway | static `{"status":"ok"}` |
+| `/api/rentals/*` | rental-service | `http://rental-service:8081` |
+| `/api/payments/*` | payment-service | `http://payment-service:8082` |
+| `/api/invoices/*` | payment-service | `http://payment-service:8082` |
+| `/api/damage-reports/*` | damage-penalty-service | `http://damage-penalty-service:8083` |
+| `/api/penalties/*` | damage-penalty-service | `http://damage-penalty-service:8083` |
 
 ## Running
 
 ```bash
-# From project root
 docker compose up gateway --build
 ```
 
-## Configuration
-
-The gateway uses Docker Compose networking. Services are accessible by their
-service names defined in `docker-compose.yml` (e.g., `service-a`, `service-b`).
-
 ## Notes
 
-- Use service names (not `localhost`) for upstream URLs inside Docker
-- The gateway exposes port 8080 to the host
+- Gateway listen nội bộ tại port `80`, publish ra host `8080` qua `docker-compose.yml`
+- Chỉ dùng Compose service names cho upstream, không dùng `localhost`

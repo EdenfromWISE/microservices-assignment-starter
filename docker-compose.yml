@@ -17,7 +17,7 @@ services:
   gateway:
     build: ./gateway
     ports:
-      - "${GATEWAY_PORT:-8080}:8000"
+      - "${GATEWAY_PORT:-8080}:80"
     depends_on:
       - rental-service
       - payment-service
@@ -27,7 +27,7 @@ services:
 
   # ─── Rental Service ──────────────────────────────
   rental-service:
-    build: ./services/service-a
+    build: ./services/rental-service
     ports:
       - "${RENTAL_SERVICE_PORT:-8081}:8081"
     env_file:
@@ -36,6 +36,8 @@ services:
       DB_HOST: rental-db
       DB_PORT: 3306
       DB_NAME: rental_db
+      DB_USER: ${DB_USER:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
       RABBITMQ_HOST: rabbitmq
     depends_on:
       rental-db:
@@ -45,7 +47,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/api/rentals/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://rental-service:8081/api/rentals/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -71,7 +73,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/api/payments/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://payment-service:8082/api/payments/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -97,7 +99,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/api/damage-reports/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://damage-penalty-service:8083/api/damage-reports/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -116,7 +118,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "rental-db", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -133,7 +135,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "payment-db", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -150,7 +152,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "damage-db", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
       timeout: 5s
       retries: 5
