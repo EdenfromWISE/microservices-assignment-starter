@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: rental-service
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:rental-db}:${DB_PORT:3306}/${DB_NAME:rental_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+server:
+  port: 8081
+
+logging:
+  level:
+    com.carrental.rental: INFO
