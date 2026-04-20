@@ -162,6 +162,10 @@ paths:
       responses:
         '201':
           description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
         '400':
           description: Invalid request
 
@@ -169,6 +173,16 @@ paths:
       summary: List invoices
       tags: [Invoices]
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
         - name: customerId
           in: query
           schema:
@@ -194,6 +208,120 @@ paths:
       responses:
         '200':
           description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+  /invoices/number/{invoiceNumber}:
+    get:
+      summary: Get invoice by invoice number
+      tags: [Invoices]
+      parameters:
+        - name: invoiceNumber
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+  /invoices/rental/{rentalId}:
+    get:
+      summary: Get invoice by rental ID
+      tags: [Invoices]
+      parameters:
+        - name: rentalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+  /invoices/{invoiceId}/penalty:
+    patch:
+      summary: Update penalty amount on invoice
+      tags: [Invoices]
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: amount
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Invoice updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+  /invoices/{invoiceId}/paid:
+    patch:
+      summary: Mark invoice as paid
+      tags: [Invoices]
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice marked as paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found
+
+  /invoices/{invoiceId}/refund:
+    patch:
+      summary: Add refund amount to invoice
+      tags: [Invoices]
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: amount
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Invoice refund updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
         '404':
           description: Invoice not found
 
@@ -228,7 +356,7 @@ components:
 
     InvoiceCreateDTO:
       type: object
-      required: [rentalId, customerId, rentalFee]
+      required: [rentalId, customerId]
       properties:
         rentalId:
           type: string
@@ -264,7 +392,7 @@ components:
 
     PaymentStatus:
       type: string
-      enum: [PENDING, COMPLETED, FAILED]
+      enum: [PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED, PARTIALLY_REFUNDED]
 
     PaymentType:
       type: string
@@ -273,3 +401,46 @@ components:
     PaymentMethod:
       type: string
       enum: [CASH, BANK_TRANSFER, CREDIT_CARD, DEBIT_CARD, E_WALLET, QR_CODE]
+
+    Invoice:
+      type: object
+      properties:
+        invoiceId:
+          type: string
+        rentalId:
+          type: string
+        customerId:
+          type: string
+        invoiceNumber:
+          type: string
+        issueDate:
+          type: string
+          format: date-time
+        dueDate:
+          type: string
+          format: date-time
+        rentalFee:
+          type: number
+        depositAmount:
+          type: number
+        penaltyAmount:
+          type: number
+        totalAmount:
+          type: number
+        paidAmount:
+          type: number
+        refundAmount:
+          type: number
+        isPaid:
+          type: boolean
+        paidAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

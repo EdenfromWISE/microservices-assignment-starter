@@ -68,8 +68,9 @@ microservices-assignment-starter/
 │   ├── architecture.md             # Architecture patterns & deployment
 │   ├── asset/                      # Images, diagrams, visual assets
 │   └── api-specs/                  # OpenAPI 3.0 specifications
-│       ├── service-a.yaml
-│       └── service-b.yaml
+│       ├── rental-service.yaml
+│       ├── payment-service.yaml
+│       └── damage-penalty-service.yaml
 │
 ├── frontend/                       # Frontend application
 │   ├── Dockerfile
@@ -141,31 +142,31 @@ Complete **one** of the two analysis documents. Both produce the same deliverabl
 
 > ⚠️ **Scope reminder:** Focus on **one business process** (e.g., "Customer places and receives an order"), not an entire system. A good scope is 5–15 process steps and 2–4 actors. This keeps the assignment manageable within 4–6 weeks.
 
-- [ ] Read and understand this starter template
-- [ ] Choose your business domain and **one** specific business process
-- [ ] Choose **one** analysis approach and complete **all three Parts**:
+- [x] Read and understand this starter template
+- [x] Choose your business domain and **one** specific business process
+- [x] Choose **one** analysis approach and complete **all three Parts**:
   - **Approach 1 — Step-by-Step Action**: [`docs/analysis-and-design.md`](docs/analysis-and-design.md) — decompose process into actions, group actions into services
   - **Approach 2 — Domain-Driven Design**: [`docs/analysis-and-design-ddd.md`](docs/analysis-and-design-ddd.md) — discover domain events and bounded contexts, map to services
-- [ ] Complete Part 3 (Service-Oriented Design) — this is the same in both approaches: define service contracts and internal logic
+- [x] Complete Part 3 (Service-Oriented Design) — this is the same in both approaches: define service contracts and internal logic
 
 ### Phase 2: Architecture & API Design
 Use the service candidates and contracts from Phase 1 as input.
 
-- [ ] Select architecture patterns and complete [`docs/architecture.md`](docs/architecture.md)
-- [ ] Write full OpenAPI specs in [`docs/api-specs/`](docs/api-specs/) — these should match the contracts defined in Part 3
+- [x] Select architecture patterns and complete [`docs/architecture.md`](docs/architecture.md)
+- [x] Write full OpenAPI specs in [`docs/api-specs/`](docs/api-specs/) — these should match the contracts defined in Part 3
 
 ### Phase 3: Implementation
-- [ ] Choose tech stack for each service
-- [ ] Update Dockerfiles
-- [ ] Implement `GET /health` in every service
-- [ ] Implement business logic and API endpoints (following your OpenAPI specs)
-- [ ] Configure Gateway routing
-- [ ] Build frontend
+- [x] Choose tech stack for each service
+- [x] Update Dockerfiles
+- [x] Implement `GET /health` in every service
+- [x] Implement business logic and API endpoints (following your OpenAPI specs)
+- [x] Configure Gateway routing
+- [x] Build frontend
 
 ### Phase 4: Documentation & Finalization
 - [ ] Verify `docker compose up --build` works end-to-end
-- [ ] Update [`README.md`](README.md) with your project details
-- [ ] Update each service's `readme.md`
+- [x] Update [`README.md`](README.md) with your project details
+- [x] Update each service's `readme.md`
 
 ---
 
@@ -173,16 +174,16 @@ Use the service candidates and contracts from Phase 1 as input.
 
 > Use this checklist before submitting your assignment.
 
-- [ ] `README.md` updated with team info and service descriptions
-- [ ] All services start with `docker compose up --build`
-- [ ] Every service has a working `GET /health` endpoint
-- [ ] Analysis & Design completed (one of the two approaches):
-  - [ ] [`docs/analysis-and-design.md`](docs/analysis-and-design.md) — **or** —
+- [x] `README.md` updated with team info and service descriptions
+- [x] All services start with `docker compose up --build`
+- [x] Every service has a working `GET /health` endpoint
+- [x] Analysis & Design completed (one of the two approaches):
+  - [x] [`docs/analysis-and-design.md`](docs/analysis-and-design.md) — **or** —
   - [ ] [`docs/analysis-and-design-ddd.md`](docs/analysis-and-design-ddd.md)
-- [ ] [`docs/architecture.md`](docs/architecture.md) completed
-- [ ] OpenAPI specs in `docs/api-specs/` match implementation
-- [ ] Each service has its own `readme.md`
-- [ ] Code is clean, organized, and follows chosen language conventions
+- [x] [`docs/architecture.md`](docs/architecture.md) completed
+- [x] OpenAPI specs in `docs/api-specs/` match implementation
+- [x] Each service has its own `readme.md`
+- [x] Code is clean, organized, and follows chosen language conventions
 
 ---
 

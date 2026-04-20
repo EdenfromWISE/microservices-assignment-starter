@@ -38,6 +38,12 @@ public class PenaltyController {
             customerId, rentalId, status, pageable);
         return ResponseEntity.ok(penalties);
     }
+
+    @GetMapping("/{penaltyId}")
+    public ResponseEntity<Penalty> getPenaltyById(@PathVariable UUID penaltyId) {
+        Penalty penalty = penaltyService.getPenaltyById(penaltyId);
+        return ResponseEntity.ok(penalty);
+    }
     
     @PostMapping("/{penaltyId}/pay")
     public ResponseEntity<Penalty> payPenalty(

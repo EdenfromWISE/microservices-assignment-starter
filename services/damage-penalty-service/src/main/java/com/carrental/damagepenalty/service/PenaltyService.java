@@ -99,4 +99,10 @@ public class PenaltyService {
         }
         return penaltyRepository.findAll(pageable);
     }
+
+    @Transactional(readOnly = true)
+    public Penalty getPenaltyById(UUID penaltyId) {
+        return penaltyRepository.findById(penaltyId)
+            .orElseThrow(() -> new PenaltyNotFoundException("Penalty not found with ID: " + penaltyId));
+    }
 }

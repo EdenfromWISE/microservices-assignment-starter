@@ -132,6 +132,10 @@ paths:
       responses:
         '201':
           description: Penalty created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Penalty'
         '400':
           description: Invalid request
 
@@ -171,6 +175,10 @@ paths:
       responses:
         '200':
           description: Penalty details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Penalty'
         '404':
           description: Penalty not found
 
@@ -194,6 +202,10 @@ paths:
       responses:
         '200':
           description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Penalty'
         '404':
           description: Penalty not found
 
@@ -201,7 +213,7 @@ components:
   schemas:
     DamageReportDTO:
       type: object
-      required: [rentalId, vehicleId, damageType, severity, description]
+      required: [rentalId, vehicleId, customerId, damageType, severity, description]
       properties:
         rentalId:
           type: string
@@ -226,8 +238,11 @@ components:
 
     PenaltyDTO:
       type: object
-      required: [rentalId, customerId, penaltyType, penaltyAmount]
+      required: [rentalId, customerId, vehicleId, penaltyType, description, penaltyAmount]
       properties:
+        damageId:
+          type: string
+          format: uuid
         rentalId:
           type: string
           format: uuid
@@ -243,13 +258,20 @@ components:
           type: string
         penaltyAmount:
           type: number
+        dueDate:
+          type: string
+          format: date
 
     PenaltyPaymentDTO:
       type: object
-      required: [amount]
+      required: [amount, paymentMethod]
       properties:
         amount:
           type: number
+        paymentMethod:
+          type: string
+        transactionId:
+          type: string
 
     DamageReport:
       type: object
@@ -295,4 +317,48 @@ components:
 
     PenaltyPaymentStatus:
       type: string
-      enum: [UNPAID, PARTIALLY_PAID, PAID]
+      enum: [UNPAID, PARTIALLY_PAID, PAID, WAIVED]
+
+    Penalty:
+      type: object
+      properties:
+        penaltyId:
+          type: string
+          format: uuid
+        damageId:
+          type: string
+          format: uuid
+        rentalId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        vehicleId:
+          type: string
+          format: uuid
+        penaltyType:
+          $ref: '#/components/schemas/PenaltyType'
+        description:
+          type: string
+        penaltyAmount:
+          type: number
+        penaltyDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        paymentStatus:
+          $ref: '#/components/schemas/PenaltyPaymentStatus'
+        paidAmount:
+          type: number
+        paymentDate:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
