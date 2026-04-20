@@ -164,7 +164,7 @@ Use the service candidates and contracts from Phase 1 as input.
 - [x] Build frontend
 
 ### Phase 4: Documentation & Finalization
-- [ ] Verify `docker compose up --build` works end-to-end
+- [x] Verify `docker compose up --build` works end-to-end
 - [x] Update [`README.md`](README.md) with your project details
 - [x] Update each service's `readme.md`
 
