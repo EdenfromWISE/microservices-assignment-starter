@@ -1,4 +1,4 @@
-# Car Rental Management System
+# Car Rental Management Module
 
 [![Stars](https://img.shields.io/github/stars/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/stargazers)
 [![Forks](https://img.shields.io/github/forks/hungdn1701/microservices-assignment-starter?style=social)](https://github.com/hungdn1701/microservices-assignment-starter/network/members)
@@ -21,7 +21,7 @@
 
 ## Business Process
 
-The system automates the vehicle rental lifecycle for a car rental domain: creating rentals, processing payments/invoices, recording damages, and managing penalties. Main actors are customer and staff; all interactions go through frontend -> gateway -> backend services.
+The module automates the vehicle rental lifecycle for a car rental domain: creating rentals, processing payments/invoices, recording damages, and managing penalties. Main actors are customer and staff; all interactions go through frontend -> gateway -> backend services.
 
 ---
 
