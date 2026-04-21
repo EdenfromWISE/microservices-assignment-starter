@@ -67,10 +67,8 @@ List existing systems, databases, or legacy logic related to this process.
 | rental-service | Microservice | Manages rental lifecycle (booking → pickup → return → inspection → completion) | REST API |
 | payment-service | Microservice | Processes deposit and penalty payments, generates invoices | REST API + RabbitMQ events |
 | damage-penalty-service | Microservice | Records damage reports, calculates repair costs, manages penalties | REST API + RabbitMQ events |
-| statistics-service | Microservice | Aggregates revenue and rental statistics, cached via Redis | REST API + RabbitMQ events |
 | PostgreSQL | Database | Persistent storage for each service (database-per-service pattern) | JDBC / Spring Data JPA |
 | RabbitMQ | Message Broker | Async event bus between services (e.g., penalty.created, payment.completed) | AMQP |
-| Redis | Cache | Caches statistics query results (TTL: 1 hour) | Spring Cache / Lettuce |
 
 ### 1.3 Non-Functional Requirements
 
@@ -80,10 +78,9 @@ Non-functional requirements serve as input in two places:
 
 | Requirement    | Description |
 |----------------|-------------|
-| Performance    | Statistics queries must respond within 1 second — achieved via Redis caching (1-hour TTL) on the statistics-service |
 | Security       | Role-based access control (RBAC): Customer can only access own rental data; Staff can manage rentals and damage reports; Admin has full access. All APIs secured via JWT |
 | Scalability    | Rental and payment services must handle traffic spikes independently — each service scales horizontally; database-per-service pattern prevents shared bottlenecks |
-| Availability   | Payment and rental services are critical — deployed with multiple replicas; RabbitMQ decouples services so a statistics or damage service outage does not block the core rental flow |
+| Availability   | Payment and rental services are critical — deployed with multiple replicas; RabbitMQ decouples services so a damage service outage does not block the core rental flow |
 
 ---
 
@@ -109,7 +106,7 @@ Decompose the process from 1.1 into granular actions. Mark actions unsuitable fo
 | 10 | NotifyCustomer | System | System sends penalty notice to customer with amount and due date | ✅ |
 | 11 | PayPenalty | Customer | Customer initiates payment for the penalty amount | ✅ |
 | 12 | ProcessPenaltyPayment | Payment Gateway | External gateway processes the penalty transaction and returns success/failure | ✅ |
-| 13 | CompleteRental | System | System transitions rental to COMPLETED and updates statistics | ✅ |
+| 13 | CompleteRental | Staff | Staff confirms rental is fully completed; rental transitions to COMPLETED | ✅ |
 
 ### 2.3 Entity Service Candidates
 
@@ -209,7 +206,6 @@ Service Contract specification for each service. Full OpenAPI specs:
 - [`docs/api-specs/rental-service.yaml`](api-specs/rental-service.yaml)
 - [`docs/api-specs/payment-service.yaml`](api-specs/payment-service.yaml)
 - [`docs/api-specs/damage-penalty-service.yaml`](api-specs/damage-penalty-service.yaml)
-- [`docs/api-specs/statistics-service.yaml`](api-specs/statistics-service.yaml)
 
 **rental-service:**
 
@@ -239,14 +235,6 @@ Service Contract specification for each service. Full OpenAPI specs:
 | `/penalties` | GET | List penalties for a rental | `?rentalId={id}` | 200 |
 | `/penalties/{id}` | GET | Get penalty details | — | 200, 404 |
 | `/penalties/{id}/pay` | POST | Mark penalty as paid | `{ paymentId }` | 200, 409 |
-
-**statistics-service:**
-
-| Endpoint | Method | Description | Request Body | Response Codes |
-|----------|--------|-------------|--------------|----------------|
-| `/statistics/revenue/monthly/{year}/{month}` | GET | Get monthly revenue | — | 200 |
-| `/statistics/revenue/quarterly/{year}/{quarter}` | GET | Get quarterly revenue | — | 200 |
-| `/statistics/revenue/yearly/{year}` | GET | Get yearly revenue | — | 200 |
 
 ### 3.2 Service Logic Design
 

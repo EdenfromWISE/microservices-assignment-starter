@@ -1,4 +1,4 @@
-# System Architecture
+# Module Architecture
 
 > This document is completed **after** the Analysis and Design phase.
 > Choose **one** analysis approach and complete it first:
@@ -56,12 +56,11 @@
 
 | Pattern | Selected? | Derived from (Analysis Step) | Business/Technical Justification |
 |---------|-----------|------------------------------|----------------------------------|
-| API Gateway | ✅ | 2.8 Service Composition | Single entry point for all client traffic; routes to rental, payment, damage-penalty, and statistics services |
+| API Gateway | ✅ | 2.8 Service Composition | Single entry point for all client traffic; routes to rental, payment, and damage-penalty services |
 | Database per Service | ✅ | 1.3 NFR: Scalability | Each service owns its own PostgreSQL database — prevents shared bottlenecks and allows independent scaling |
 | Shared Database | ❌ | — | Rejected — would couple service deployments and prevent independent scaling |
 | Saga | ❌ | — | Not needed — cross-service consistency is handled via async events (penalty.created, payment.completed) rather than distributed transactions |
-| Event-driven / Message Queue | ✅ | 1.3 NFR: Availability + 2.8 Service Composition | RabbitMQ decouples services; a statistics or damage service outage does not block the core rental flow |
-| CQRS | ✅ | 1.3 NFR: Performance | statistics-service separates read (Redis-cached queries) from write (event-driven updates) to achieve sub-1s response time |
+| Event-driven / Message Queue | ✅ | 1.3 NFR: Availability + 2.8 Service Composition | RabbitMQ decouples services; a damage service outage does not block the core rental flow |
 | Circuit Breaker | ❌ | — | Not implemented in current scope; recommended for production to protect payment gateway calls |
 | Service Registry / Discovery | ❌ | — | Not needed — Docker Compose DNS handles service-to-service routing by service name |
 
@@ -77,12 +76,11 @@
 | **Gateway** | Single entry point — routes requests to downstream services | Nginx | 8080 |
 | **rental-service** | Manages rental lifecycle: booking, pickup, return, completion (State Pattern) | Java 17, Spring Boot 3 | 8081 |
 | **payment-service** | Processes deposit and penalty payments, generates invoices | Java 17, Spring Boot 3 | 8082 |
-| **damage-penalty-service** | Records damage reports, auto-calculates repair costs, manages penalties | Java 17, Spring Boot 3 | 8080 |
-| **rental-db** | Stores rentals and rental state history | PostgreSQL 15 | 5432 |
-| **payment-db** | Stores payments and invoices | PostgreSQL 15 | 5433 |
-| **damage-db** | Stores damage reports and penalties | PostgreSQL 15 | 5434 |
+| **damage-penalty-service** | Records damage reports, auto-calculates repair costs, manages penalties | Java 17, Spring Boot 3 | 8083 |
+| **rental-db** | Stores rentals and rental state history | MySQL 8 | 3306 |
+| **payment-db** | Stores payments and invoices | MySQL 8 | 3306 |
+| **damage-db** | Stores damage reports and penalties | MySQL 8 | 3306 |
 | **RabbitMQ** | Async event bus between services | RabbitMQ 3 | 5672 |
-| **Redis** | Caches statistics query results (TTL: 1 hour) | Redis 7 | 6379 |
 
 ---
 
@@ -142,12 +140,12 @@ Who uses the system and what external systems does it interact with?
 
 ```mermaid
 C4Context
-    title System Context — Car Rental Management System
+    title System Context — Car Rental Management Module
 
     Person(customer, "Customer", "Books vehicles, pays deposits and penalties via web UI")
     Person(staff, "Staff", "Confirms bookings, inspects vehicles, reports damage")
 
-    System(system, "Car Rental Management System", "Automates the car rental process from booking to completion, including damage reporting and penalty payment")
+    System(system, "Car Rental Management Module", "Automates the car rental process from booking to completion, including damage reporting and penalty payment")
 
     System_Ext(extPayment, "Payment Gateway", "Processes deposit and penalty payment transactions")
 
@@ -162,7 +160,7 @@ All runtime containers and how they communicate. This is the **primary architect
 
 ```mermaid
 C4Container
-    title Container Diagram — Car Rental Management System
+    title Container Diagram — Car Rental Management Module
 
     Person(customer, "Customer")
     Person(staff, "Staff")
@@ -173,10 +171,10 @@ C4Container
 
         Container(rental, "rental-service", "Java 17, Spring Boot 3", "Manages rental lifecycle with State Pattern. Port 8081")
         Container(payment, "payment-service", "Java 17, Spring Boot 3", "Processes payments and invoices. Port 8082")
-        Container(damage, "damage-penalty-service", "Java 17, Spring Boot 3", "Records damage reports and auto-creates penalties. Port 8080")
-        ContainerDb(rentaldb, "rental-db", "PostgreSQL 15", "Rentals and state history. Port 5432")
-        ContainerDb(paymentdb, "payment-db", "PostgreSQL 15", "Payments and invoices. Port 5433")
-        ContainerDb(damagedb, "damage-db", "PostgreSQL 15", "Damage reports and penalties. Port 5434")
+        Container(damage, "damage-penalty-service", "Java 17, Spring Boot 3", "Records damage reports and auto-creates penalties. Port 8083")
+        ContainerDb(rentaldb, "rental-db", "MySQL 8", "Rentals and state history")
+        ContainerDb(paymentdb, "payment-db", "MySQL 8", "Payments and invoices")
+        ContainerDb(damagedb, "damage-db", "MySQL 8", "Damage reports and penalties")
 
         Container(broker, "RabbitMQ", "RabbitMQ 3", "Async event bus — penalty.created, payment.completed. Port 5672")
     }
@@ -193,7 +191,6 @@ C4Container
     Rel(rental, broker, "Publishes events", "AMQP")
     Rel(payment, broker, "Publishes events", "AMQP")
     Rel(damage, broker, "Publishes events", "AMQP")
-    Rel(broker, rental, "Delivers events", "AMQP")
 ```
 
 > 💡 **How to adapt this diagram:**
